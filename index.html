@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Google Sheets CSV Analyzer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+            padding: 20px;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px 30px 30px 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 20px;
+            margin: 10px 0 20px 0;
+            box-sizing: border-box;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .output {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e7f3fe;
+            border-left: 6px solid #2196F3;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        .error {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fdecea;
+            border-left: 6px solid #f44336;
+            color: #a94442;
+            word-wrap: break-word;
+        }
+        #copyBtn {
+            margin-top: 10px;
+            display: none;
+            background-color: #007BFF;
+        }
+        #copyBtn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Аналізатор CSV Google Sheets</h1>
+        <input type="text" id="csvUrl" placeholder="Введіть посилання на CSV (Google Sheets)">
+        <button id="processBtn">Обробити</button>
+        <button id="copyBtn">Копіювати результат</button>
+        <div id="result" class="output" style="display:none;"></div>
+        <div id="error" class="error" style="display:none;"></div>
+    </div>
+
+    <script>
+        document.getElementById('processBtn').addEventListener('click', function() {
+            const url = document.getElementById('csvUrl').value.trim();
+            const resultDiv = document.getElementById('result');
+            const errorDiv = document.getElementById('error');
+            const copyBtn = document.getElementById('copyBtn');
+            resultDiv.style.display = 'none';
+            errorDiv.style.display = 'none';
+            copyBtn.style.display = 'none';
+
+            if (!url) {
+                errorDiv.textContent = 'Будь ласка, введіть посилання на CSV.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Не вдалося завантажити CSV. Перевірте посилання.');
+                    }
+                    return response.text();
+                })
+                .then(data => {
+                    const rows = parseCSV(data);
+                    if (rows.length < 2) {
+                        throw new Error('CSV має містити принаймні один рядок даних (крім заголовка).');
+                    }
+                    // Remove header
+                    const dataRows = rows.slice(1);
+                    const output = computeCounts(dataRows);
+                    // Форматуємо результат як значення, розділені табуляцією, для Excel
+                    const formattedResult = output.join('\t');
+                    resultDiv.textContent = formattedResult;
+                    resultDiv.style.display = 'block';
+                    copyBtn.style.display = 'block';
+                })
+                .catch(error => {
+                    errorDiv.textContent = error.message;
+                    errorDiv.style.display = 'block';
+                });
+        });
+
+        // Копіювати результат у буфер обміну
+        document.getElementById('copyBtn').addEventListener('click', function() {
+            const resultDiv = document.getElementById('result');
+            const text = resultDiv.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Результат скопійовано у буфер обміну!');
+            }).catch(err => {
+                alert('Не вдалося скопіювати текст: ' + err);
+            });
+        });
+
+        // Простий парсер CSV
+        function parseCSV(text) {
+            const rows = [];
+            const lines = text.split(/\r?\n/);
+            for (let line of lines) {
+                if (line.trim() === '') continue; // Пропустити порожні рядки
+                // Обробка полів, які можуть містити коми всередині лапок
+                const values = [];
+                let value = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"' && (i === 0 || line[i - 1] !== '\\')) {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        values.push(value.trim().replace(/^"|"$/g, ''));
+                        value = '';
+                    } else {
+                        value += char;
+                    }
+                }
+                values.push(value.trim().replace(/^"|"$/g, ''));
+                rows.push(values);
+            }
+            return rows;
+        }
+
+        function computeCounts(rows) {
+            const totalRows = rows.length;
+
+            // Ініціалізація лічильників
+            let countG_B = 0;
+            let countG_V = 0;
+
+            // Інші підрахунки (при необхідності)
+
+            // Підготовка вихідного масиву відповідно до вимог
+            const output = [];
+
+            // Додати кількість рядків як перший елемент
+            output.push(totalRows);
+
+            // Сума кількості 'Б' та 'В' у G
+            const sumG_B_V = countG_B + countG_V;
+            output.push(sumG_B_V);
+
+            // Кількість 'Б' у G
+            output.push(countG_B);
+
+            // Кількість 'В' у G
+            output.push(countG_V);
+
+            // Додати цифру 0
+            output.push(0);
+
+            return output;
+        }
+    </script>
+</body>
+</html>
